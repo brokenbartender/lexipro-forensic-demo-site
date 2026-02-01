@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, Mail, Stethoscope, AlertCircle, ScanLine, Loader2, X, BrainCircuit, Scale, ChevronRight, UserCheck, Terminal, Check, Anchor, Plus, UploadCloud } from 'lucide-react';
 import { EvidenceItem, AnalysisResult } from '../types';
-import { analyzeEvidence } from '../services/geminiService';
+import { analyzeEvidence, getAiMode } from '../services/analysisService';
 
 // Initial seed data (now stateful)
 const INITIAL_EVIDENCE: EvidenceItem[] = [
@@ -57,6 +57,7 @@ const TypewriterText = ({ text, delay = 10, onComplete }: { text: string; delay?
 };
 
 const EvidenceMatrix: React.FC = () => {
+  const aiMode = getAiMode();
   // State
   const [evidenceList, setEvidenceList] = useState<EvidenceItem[]>(INITIAL_EVIDENCE);
   const [selectedEvidence, setSelectedEvidence] = useState<EvidenceItem | null>(null);
@@ -153,7 +154,7 @@ const EvidenceMatrix: React.FC = () => {
               <div className="flex flex-col items-center justify-center py-12 space-y-4">
                 <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
                 <div className="text-center">
-                  <p className="text-slate-300 text-sm font-medium">Running Simulated Forensic Engine</p>
+                  <p className="text-slate-300 text-sm font-medium">Running Forensic AI Engine</p>
                   <p className="text-slate-500 text-xs mt-1">Generating structured, audit-safe analysis...</p>
                 </div>
               </div>
@@ -188,7 +189,7 @@ const EvidenceMatrix: React.FC = () => {
                   <div>
                     <h4 className="flex items-center text-sm font-bold text-white mb-3 tracking-wide uppercase">
                       <BrainCircuit className="h-4 w-4 mr-2 text-purple-400" />
-                      AI Reasoning (Chain-of-Thought)
+                      Reasoning Summary
                     </h4>
                     <div className="text-slate-300 text-sm leading-relaxed font-mono text-xs bg-slate-800/50 p-4 rounded border border-slate-700">
                        <span className="text-purple-400 block mb-2">{">"} ANALYZING CAUSATION...</span>
@@ -248,8 +249,12 @@ const EvidenceMatrix: React.FC = () => {
           <div>
             <h2 className="text-3xl md:text-4xl font-serif font-bold text-white mb-4">Unified Evidence Matrix™</h2>
             <p className="text-slate-400 max-w-2xl">
-                Ingest case files and trigger immediate forensic analysis by the simulated forensic engine (demo mode).
+                Ingest case files and trigger immediate forensic analysis with the evidence-bound AI engine.
             </p>
+            <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1 text-[11px] uppercase tracking-[0.3em] text-slate-400">
+              <span className={`h-2 w-2 rounded-full ${aiMode === 'live' ? 'bg-green-400' : 'bg-amber-400'}`} />
+              {aiMode === 'live' ? 'Live AI' : 'Demo AI'}
+            </div>
           </div>
 
           {/* Unified Ingestion Hub UI */}

@@ -15,6 +15,26 @@ LexiPro Forensic OS is a deterministic evidence-layer concept built for **medica
 - The demo analysis is offline/deterministic.
 - If you want a live LLM-backed version, proxy requests through a server-side endpoint (serverless function / private API) where secrets remain private.
 
+## Optional live AI integration (recommended pattern)
+
+This site supports a "live AI" mode that calls your own backend. It never stores API keys in the browser.
+
+Add these env vars at build time:
+
+```bash
+VITE_AI_MODE=live
+VITE_AI_ENDPOINT=https://your-backend.example.com/api/lexi/analyze
+VITE_AI_CHAT_ENDPOINT=https://your-backend.example.com/api/lexi/chat
+VITE_AI_DEMO_KEY=non-secret-demo-token
+```
+
+If `VITE_AI_MODE=demo` or `VITE_AI_ENDPOINT` is empty, the site falls back to the deterministic demo engine.
+
+### Suggested backend options
+
+- Use a private API (Express, Fastify, Next.js API route, Cloudflare Workers, etc).
+- Or deploy `genie-foundry` as a minimal AI gateway and expose a single CORS-safe endpoint.
+
 ## Tech Stack
 
 - Vite + React + TypeScript

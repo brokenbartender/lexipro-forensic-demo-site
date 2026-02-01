@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { askAppQuestion, getChatMode } from './services/chatService';
 
 function App() {
   const [activeDemo, setActiveDemo] = useState('intake');
@@ -22,6 +23,19 @@ function App() {
   const [proofModal, setProofModal] = useState<{ title: string; detail: string } | null>(null);
   const [comparisonValue, setComparisonValue] = useState(55);
   const [roiVisible, setRoiVisible] = useState(false);
+  const [chatMessages, setChatMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([
+    {
+      role: 'assistant',
+      content:
+        'Ask me anything about the demo: pillars, security, integrations, ROI, or how deterministic outputs work.',
+    },
+  ]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const [showTourComplete, setShowTourComplete] = useState(true);
+  const [lastActionAt, setLastActionAt] = useState<string | null>(null);
+  const [heroMetrics, setHeroMetrics] = useState({ timeSaved: 0, auditReady: 0 });
+  const [showCopyToast, setShowCopyToast] = useState(false);
   const roiRef = useRef<HTMLDivElement | null>(null);
 
   const demoModules = useMemo(
@@ -35,9 +49,11 @@ function App() {
     ],
     [],
   );
+  const chatMode = getChatMode();
 
   const addLog = (message: string) => {
     setDemoLog((prev) => [...prev.slice(-5), message]);
+    setLastActionAt(new Date().toISOString());
   };
 
   const demoTimeline = [
@@ -100,6 +116,7 @@ function App() {
     if (tourRunning) return;
     setTourRunning(true);
     setTourStep(0);
+    setShowTourComplete(true);
     addLog('Guided investigation started.');
     const interval = setInterval(() => {
       setTourStep((prev) => {
@@ -116,6 +133,35 @@ function App() {
     }, 600);
   };
 
+  const sendChat = async () => {
+    if (!chatInput.trim() || chatLoading) return;
+    const question = chatInput.trim();
+    setChatInput('');
+    setChatLoading(true);
+    setChatMessages((prev) => [...prev, { role: 'user', content: question }]);
+    try {
+      const answer = await askAppQuestion(question);
+      setChatMessages((prev) => [...prev, { role: 'assistant', content: answer }]);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let raf;
+    const start = performance.now();
+    const animate = (now) => {
+      const progress = Math.min(1, (now - start) / 1200);
+      setHeroMetrics({
+        timeSaved: Math.round(progress * 214),
+        auditReady: Math.round(progress * 97),
+      });
+      if (progress < 1) raf = requestAnimationFrame(animate);
+    };
+    raf = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
   useEffect(() => {
     if (!roiRef.current) return;
     const observer = new IntersectionObserver(
@@ -130,6 +176,24 @@ function App() {
     return () => observer.disconnect();
   }, []);
 
+
+  const copyDemoSummary = async () => {
+    const summary = [
+      'LexiPro Forensic OS Demo Summary',
+      'Pillars: Evidence Integrity, Bounded Reasoning, Auditability',
+      'Deterministic outputs with anchored citations',
+      'Integrations: Relativity, iManage, Clio (export-ready)',
+      'ROI: 14.5 hours saved, 82% overhead reduction, ,200 recovery',
+    ].join('\n');
+    try {
+      await navigator.clipboard.writeText(summary);
+      setShowCopyToast(true);
+      setTimeout(() => setShowCopyToast(false), 2000);
+    } catch {
+      setToastMessage('Copy failed. Please try again.');
+      setTimeout(() => setToastMessage(''), 2000);
+    }
+  };
   const exportAuditCsv = () => {
     const rows = [
       ['Event', 'Detail'],
@@ -331,7 +395,9 @@ function App() {
                       key={metric.label}
                       className="rounded-2xl border border-white/10 bg-lexi-ink/70 px-3 py-4"
                     >
-                      <p className="text-lg font-semibold text-white">{metric.value}</p>
+                      <p className="text-lg font-semibold text-white">
+                        {metric.label === 'Case time saved' ? `${heroMetrics.timeSaved}h` : `${heroMetrics.auditReady}%`}
+                      </p>
                       <p className="mt-1 text-[10px] uppercase tracking-[0.25em] text-lexi-slate">
                         {metric.label}
                       </p>
@@ -433,6 +499,14 @@ function App() {
                     deterministic audit hash, producing a tamper-evident ledger that is verifiable
                     on demand.
                   </p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-lexi-ink/70 px-6 py-5">
+                  <p className="text-xs uppercase tracking-[0.3em] text-lexi-slate">Data handling</p>
+                  <ul className="mt-3 space-y-2 text-sm text-lexi-slate">
+                    <li>Retention window: 90 days (configurable)</li>
+                    <li>Encryption: AES-256 at rest, TLS 1.2+ in transit</li>
+                    <li>Audit ledger: append-only, tamper-evident</li>
+                  </ul>
                 </div>
               </div>
               <div className="rounded-2xl border border-white/10 bg-lexi-ink/70 px-6 py-5">
@@ -536,6 +610,11 @@ function App() {
                   </div>
                   <button
                     type="button"
+                    onClick={() => {
+                      addLog('Guided intake triggered.');
+                      setToastMessage('Intake sealed (Hash 9f3a...c1d8).');
+                      setTimeout(() => setToastMessage(''), 2200);
+                    }}
                     className="w-full rounded-full bg-lexi-sun px-4 py-2 text-xs font-semibold uppercase tracking-[0.3em] text-lexi-ink"
                   >
                     Run intake
@@ -585,10 +664,24 @@ function App() {
                       <span className="font-mono text-lexi-slate">Confidence 0.98</span>
                     </div>
                     <div className="flex gap-2">
-                      <button className="flex-1 rounded-full border border-lexi-sun/40 px-3 py-2 text-[10px] uppercase tracking-[0.3em] text-lexi-sun">
+                      <button
+                        className="flex-1 rounded-full border border-lexi-sun/40 px-3 py-2 text-[10px] uppercase tracking-[0.3em] text-lexi-sun"
+                        onClick={() => {
+                          addLog('Attorney review: APPROVED Fact E-211.');
+                          setToastMessage('Attorney review approved (Audit ID: AR-211-A).');
+                          setTimeout(() => setToastMessage(''), 2200);
+                        }}
+                      >
                         Approve
                       </button>
-                      <button className="flex-1 rounded-full border border-white/20 px-3 py-2 text-[10px] uppercase tracking-[0.3em] text-lexi-mist">
+                      <button
+                        className="flex-1 rounded-full border border-white/20 px-3 py-2 text-[10px] uppercase tracking-[0.3em] text-lexi-mist"
+                        onClick={() => {
+                          addLog('Attorney review: REJECTED Fact E-211.');
+                          setToastMessage('Attorney review rejected (Audit ID: AR-211-R).');
+                          setTimeout(() => setToastMessage(''), 2200);
+                        }}
+                      >
                         Reject
                       </button>
                     </div>
@@ -602,6 +695,79 @@ function App() {
                       2026-02-01T06:12:20Z
                     </span>
                   </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-8 rounded-3xl border border-white/10 bg-lexi-ink/70 p-6">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.3em] text-lexi-sun">Ask LexiPro</p>
+                  <h3 className="mt-2 text-2xl font-semibold text-white">
+                    AI answers about the product.
+                  </h3>
+                  <p className="mt-2 text-sm text-lexi-slate">
+                    Ask about pillars, integrations, security, or ROI. Responses are evidence-bound and concise.
+                  </p>
+                </div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-lexi-ink/80 px-3 py-1 text-[10px] uppercase tracking-[0.3em] text-lexi-slate">
+                  <span className={`h-2 w-2 rounded-full ${chatMode === 'live' ? 'bg-green-400' : 'bg-amber-400'}`} />
+                  {chatMode === 'live' ? 'Live AI' : 'Demo AI'}
+                </div>
+              </div>
+
+              <div className="mt-6 rounded-2xl border border-white/10 bg-lexi-ink/80 p-4">
+                <div className="max-h-56 space-y-3 overflow-y-auto text-sm text-lexi-mist">
+                  {chatMessages.map((msg, index) => (
+                    <div
+                      key={`${msg.role}-${index}`}
+                      className={`rounded-2xl border px-4 py-3 ${
+                        msg.role === 'assistant'
+                          ? 'border-white/10 bg-white/5'
+                          : 'border-lexi-sun/30 bg-lexi-sun/10 text-lexi-mist'
+                      }`}
+                    >
+                      <p className="text-[10px] uppercase tracking-[0.3em] text-lexi-slate">
+                        {msg.role === 'assistant' ? 'LexiPro AI' : 'You'}
+                      </p>
+                      <p className="mt-2">{msg.content}</p>
+                      {msg.role === 'assistant' ? (
+                        <div className="mt-3 flex flex-wrap gap-2 text-[9px] uppercase tracking-[0.3em] text-lexi-slate">
+                          <span className="rounded-full border border-white/15 px-2 py-1">Pillars</span>
+                          <span className="rounded-full border border-white/15 px-2 py-1">Trust</span>
+                          <span className="rounded-full border border-white/15 px-2 py-1">Demo</span>
+                          <span className="rounded-full border border-white/15 px-2 py-1">ROI</span>
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                  {chatLoading ? (
+                    <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-lexi-slate">
+                      Thinking...
+                    </div>
+                  ) : null}
+                </div>
+                <div className="mt-4 flex flex-col gap-3 md:flex-row">
+                  <input
+                    value={chatInput}
+                    onChange={(event) => setChatInput(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        sendChat();
+                      }
+                    }}
+                    aria-label="Ask the demo assistant"
+                    placeholder="Ask about pillars, security, integrations, ROI..."
+                    className="flex-1 rounded-xl border border-white/10 bg-lexi-ink/70 px-4 py-3 text-sm text-lexi-mist"
+                  />
+                  <button
+                    type="button"
+                    onClick={sendChat}
+                    className="rounded-full border border-lexi-sun/40 px-6 py-3 text-xs uppercase tracking-[0.3em] text-lexi-sun transition hover:border-lexi-sun hover:bg-lexi-sun hover:text-lexi-ink"
+                  >
+                    Ask
+                  </button>
                 </div>
               </div>
             </div>
@@ -666,7 +832,12 @@ function App() {
                       {evidenceAnchors.map((anchor) => (
                         <div
                           key={anchor.id}
-                          className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4"
+                          onClick={() => {
+                            setToastMessage(`Anchor ${anchor.id} verified against ${anchor.source}.`);
+                            setTimeout(() => setToastMessage(''), 2200);
+                            addLog(`Anchor verified: ${anchor.id}.`);
+                          }}
+                          className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4 hover:border-lexi-sun/50 cursor-pointer"
                         >
                           <div className="flex items-center justify-between text-xs uppercase tracking-[0.25em] text-lexi-slate">
                             <span>{anchor.id}</span>
@@ -711,7 +882,11 @@ function App() {
                     </div>
                     <div className="flex flex-wrap items-center gap-4">
                       <button
-                        onClick={runAudit}
+                        onClick={() => {
+                          runAudit();
+                          setToastMessage('Admissibility audit complete (Score 96/100).');
+                          setTimeout(() => setToastMessage(''), 2200);
+                        }}
                         className="rounded-full border border-white/20 px-6 py-3 text-xs uppercase tracking-[0.3em] text-lexi-mist hover:border-white/40"
                       >
                         Run audit
@@ -749,8 +924,13 @@ function App() {
                           <button
                             type="button"
                             onClick={() => {
-                              setToastMessage(`${item.label} queued.`);
+                              const exportId = `EXP-${Math.floor(Math.random() * 900 + 100)}`;
+                              const checksum = `${Math.random().toString(16).slice(2, 6)}...${Math.random()
+                                .toString(16)
+                                .slice(2, 6)}`;
+                              setToastMessage(`${item.label} queued. ID ${exportId} | checksum ${checksum}`);
                               setTimeout(() => setToastMessage(''), 2200);
+                              addLog(`Integration export queued: ${item.label} (${exportId}).`);
                             }}
                             className="mt-4 w-full rounded-full border border-white/20 px-3 py-2 text-[10px] uppercase tracking-[0.3em] text-lexi-mist hover:border-white/40"
                           >
@@ -800,7 +980,11 @@ function App() {
                     </div>
                     <div className="flex flex-wrap items-center gap-4">
                       <button
-                        onClick={runSecurity}
+                        onClick={() => {
+                          runSecurity();
+                          setToastMessage('Security check started.');
+                          setTimeout(() => setToastMessage(''), 2200);
+                        }}
                         className="rounded-full bg-lexi-sun px-6 py-3 text-xs font-semibold uppercase tracking-[0.3em] text-lexi-ink disabled:opacity-70"
                         disabled={securityRunning}
                       >
@@ -834,7 +1018,7 @@ function App() {
                           key={metric.label}
                           className="rounded-2xl border border-white/10 bg-white/5 px-4 py-6 text-center"
                         >
-                          <p className="text-3xl font-semibold text-white">{metric.value}</p>
+                          <p className="text-3xl font-semibold text-white">{roiVisible ? metric.value : '0'}</p>
                           <p className="mt-2 text-xs uppercase tracking-[0.3em] text-lexi-slate">
                             {metric.label}
                           </p>
@@ -851,7 +1035,7 @@ function App() {
                           key={metric.label}
                           className="rounded-2xl border border-white/10 bg-lexi-ink/70 px-4 py-6 text-center"
                         >
-                          <p className="text-3xl font-semibold text-white">{metric.value}</p>
+                          <p className="text-3xl font-semibold text-white">{roiVisible ? metric.value : '0'}</p>
                           <p className="mt-2 text-xs uppercase tracking-[0.3em] text-lexi-slate">
                             {metric.label}
                           </p>
@@ -1004,14 +1188,21 @@ function App() {
 
         <section id="proof" className="mx-auto w-full max-w-6xl px-6 pb-20">
           <div className="grid gap-10 md:grid-cols-[1.1fr_0.9fr]">
-            <div className="space-y-6">
-              <p className="text-xs uppercase tracking-[0.4em] text-lexi-sun">Proof signals</p>
-              <h2 className="font-display text-3xl text-white md:text-4xl">Everything is measurable.</h2>
-              <p className="text-sm text-lexi-slate">
-                The demo makes the pillars visible with a clear evidence trail, integrity checks,
-                and repeatable outputs. It is designed for diligence walkthroughs and review sessions.
-              </p>
-            </div>
+              <div className="space-y-6">
+                <p className="text-xs uppercase tracking-[0.4em] text-lexi-sun">Proof signals</p>
+                <h2 className="font-display text-3xl text-white md:text-4xl">Everything is measurable.</h2>
+                <p className="text-sm text-lexi-slate">
+                  The demo makes the pillars visible with a clear evidence trail, integrity checks,
+                  and repeatable outputs. It is designed for diligence walkthroughs and review sessions.
+                </p>
+                <button
+                  type="button"
+                  onClick={copyDemoSummary}
+                  className="rounded-full border border-white/20 px-5 py-2 text-[10px] uppercase tracking-[0.3em] text-lexi-mist hover:border-white/40"
+                >
+                  Copy demo summary
+                </button>
+              </div>
             <div className="grid gap-4">
               {[
                 'Every claim cites a verified anchor',
@@ -1205,16 +1396,29 @@ function App() {
         <span className="heartbeat-dot" />
         <span>SYSTEM ACTIVE</span>
         <span>ENCRYPTION: AES-256</span>
-        <span>LAST AUDIT: 2s AGO</span>
+        <span>LAST ACTION: {lastActionAt ? lastActionAt : 'Awaiting input'}</span>
       </div>
-      {tourStep >= guidedSteps.length && !tourRunning ? (
-        <div className="fixed left-1/2 top-20 z-40 -translate-x-1/2 rounded-full border border-lexi-sun/40 bg-lexi-ink/90 px-4 py-2 text-[10px] uppercase tracking-[0.3em] text-lexi-sun shadow-[0_12px_32px_rgba(0,0,0,0.35)]">
-          Tour complete - deterministic output verified
+      {tourStep >= guidedSteps.length && !tourRunning && showTourComplete ? (
+        <div className="fixed left-1/2 top-20 z-40 flex items-center gap-3 -translate-x-1/2 rounded-full border border-lexi-sun/40 bg-lexi-ink/90 px-4 py-2 text-[10px] uppercase tracking-[0.3em] text-lexi-sun shadow-[0_12px_32px_rgba(0,0,0,0.35)]">
+          <span>Tour complete - deterministic output verified</span>
+          <button
+            type="button"
+            onClick={() => setShowTourComplete(false)}
+            className="text-[10px] uppercase tracking-[0.3em] text-lexi-slate"
+            aria-label="Dismiss tour completion"
+          >
+            Dismiss
+          </button>
         </div>
       ) : null}
       {toastMessage ? (
         <div className="fixed right-6 top-24 z-50 rounded-2xl border border-white/10 bg-lexi-ink/90 px-4 py-3 text-xs text-lexi-mist shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
           {toastMessage}
+        </div>
+      ) : null}
+      {showCopyToast ? (
+        <div className="fixed right-6 top-36 z-50 rounded-2xl border border-white/10 bg-lexi-ink/90 px-4 py-3 text-xs text-lexi-mist shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
+          Demo summary copied to clipboard.
         </div>
       ) : null}
       {proofModal ? (
@@ -1233,11 +1437,15 @@ function App() {
             <h3 className="mt-4 text-xl font-semibold text-white">{proofModal.title}</h3>
             <p className="mt-2 text-sm text-lexi-slate">{proofModal.detail}</p>
             <div className="mt-4 rounded-2xl border border-white/10 bg-lexi-ink/80 px-4 py-6 text-xs text-lexi-mist">
-              <p className="text-[10px] uppercase tracking-[0.3em] text-lexi-slate">Preview</p>
+              <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.3em] text-lexi-slate">
+                <span>Preview</span>
+                <span className="rounded-full border border-lexi-sun/40 px-2 py-1 text-lexi-sun">Watermark: Demo</span>
+              </div>
               <div className="mt-3 space-y-2 font-mono text-lexi-mist">
                 <div>Report hash: 9f3a...c1d8</div>
                 <div>Signature: 4c21...a90f</div>
                 <div>Ledger events: 42</div>
+                <div>Export ID: LXP-2026-021</div>
                 <div>Status: VERIFIED</div>
               </div>
             </div>
