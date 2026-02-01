@@ -19,6 +19,7 @@ function App() {
   const [demoModalOpen, setDemoModalOpen] = useState(false);
   const [demoEmail, setDemoEmail] = useState('');
   const [demoSubmitted, setDemoSubmitted] = useState(false);
+  const [proofModal, setProofModal] = useState<{ title: string; detail: string } | null>(null);
 
   const demoModules = useMemo(
     () => [
@@ -110,6 +111,23 @@ function App() {
         return next;
       });
     }, 600);
+  };
+
+  const exportAuditCsv = () => {
+    const rows = [
+      ['Event', 'Detail'],
+      ...demoLog.map((entry, index) => [`${index + 1}`, entry]),
+    ];
+    const csv = rows.map((row) => row.map((cell) => `"${cell}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'lexipro-audit-log.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+    setToastMessage('Audit log CSV exported.');
+    setTimeout(() => setToastMessage(''), 2200);
   };
 
   const runIntake = () => {
@@ -853,6 +871,13 @@ function App() {
                     </div>
                   ))}
                 </div>
+                <button
+                  type="button"
+                  onClick={exportAuditCsv}
+                  className="mt-4 w-full rounded-full border border-white/20 px-4 py-2 text-[10px] uppercase tracking-[0.3em] text-lexi-mist hover:border-white/40"
+                >
+                  Export CSV
+                </button>
                 <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs uppercase tracking-[0.3em] text-lexi-slate">
                   Output mode: evidence-bound
                 </div>
@@ -970,10 +995,17 @@ function App() {
                 ].map((item) => (
                   <div
                     key={item.title}
-                    className="rounded-2xl border border-white/10 bg-lexi-ink/70 px-6 py-6"
+                    className="group rounded-2xl border border-white/10 bg-lexi-ink/70 px-6 py-6 transition hover:-translate-y-1 hover:border-white/30"
                   >
                     <h3 className="text-lg font-semibold text-white">{item.title}</h3>
                     <p className="mt-3 text-sm text-lexi-slate">{item.detail}</p>
+                    <button
+                      type="button"
+                      onClick={() => setProofModal(item)}
+                      className="mt-4 w-full rounded-full border border-white/20 px-4 py-2 text-[10px] uppercase tracking-[0.3em] text-lexi-mist transition group-hover:border-lexi-sun/60 group-hover:text-lexi-sun"
+                    >
+                      Preview artifact
+                    </button>
                   </div>
                 ))}
               </div>
@@ -1102,9 +1134,51 @@ function App() {
           <span>Evidence bound. Audit ready. Deployment proven.</span>
         </div>
       </footer>
+      {tourStep >= guidedSteps.length && !tourRunning ? (
+        <div className="fixed left-1/2 top-20 z-40 -translate-x-1/2 rounded-full border border-lexi-sun/40 bg-lexi-ink/90 px-4 py-2 text-[10px] uppercase tracking-[0.3em] text-lexi-sun shadow-[0_12px_32px_rgba(0,0,0,0.35)]">
+          Tour complete - deterministic output verified
+        </div>
+      ) : null}
       {toastMessage ? (
         <div className="fixed right-6 top-24 z-50 rounded-2xl border border-white/10 bg-lexi-ink/90 px-4 py-3 text-xs text-lexi-mist shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
           {toastMessage}
+        </div>
+      ) : null}
+      {proofModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-6">
+          <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-lexi-panel p-6">
+            <div className="flex items-center justify-between">
+              <p className="text-xs uppercase tracking-[0.3em] text-lexi-sun">Artifact preview</p>
+              <button
+                type="button"
+                onClick={() => setProofModal(null)}
+                className="text-xs uppercase tracking-[0.3em] text-lexi-slate"
+              >
+                Close
+              </button>
+            </div>
+            <h3 className="mt-4 text-xl font-semibold text-white">{proofModal.title}</h3>
+            <p className="mt-2 text-sm text-lexi-slate">{proofModal.detail}</p>
+            <div className="mt-4 rounded-2xl border border-white/10 bg-lexi-ink/80 px-4 py-6 text-xs text-lexi-mist">
+              <p className="text-[10px] uppercase tracking-[0.3em] text-lexi-slate">Preview</p>
+              <div className="mt-3 space-y-2 font-mono text-lexi-mist">
+                <div>Report hash: 9f3a...c1d8</div>
+                <div>Signature: 4c21...a90f</div>
+                <div>Ledger events: 42</div>
+                <div>Status: VERIFIED</div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setToastMessage(`${proofModal.title} queued for download.`);
+                setTimeout(() => setToastMessage(''), 2200);
+              }}
+              className="mt-4 w-full rounded-full border border-lexi-sun/40 px-4 py-2 text-[10px] uppercase tracking-[0.3em] text-lexi-sun hover:border-lexi-sun hover:bg-lexi-sun hover:text-lexi-ink"
+            >
+              Download artifact
+            </button>
+          </div>
         </div>
       ) : null}
       {demoModalOpen ? (
