@@ -13,6 +13,12 @@ function App() {
   const [tourRunning, setTourRunning] = useState(false);
   const [tourStep, setTourStep] = useState(0);
   const [activeSignal, setActiveSignal] = useState('integrity');
+  const [securityStatus, setSecurityStatus] = useState('Ready');
+  const [securityRunning, setSecurityRunning] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [demoModalOpen, setDemoModalOpen] = useState(false);
+  const [demoEmail, setDemoEmail] = useState('');
+  const [demoSubmitted, setDemoSubmitted] = useState(false);
 
   const demoModules = useMemo(
     () => [
@@ -122,26 +128,40 @@ function App() {
   };
 
   const runSecurity = () => {
-    addLog('Security scan verified guardrails + audit trail.');
+    if (securityRunning) return;
+    setSecurityRunning(true);
+    setSecurityStatus('Running diagnostics...');
+    addLog('Security scan started.');
+    setTimeout(() => {
+      setSecurityStatus('Verifying encryption...');
+    }, 700);
+    setTimeout(() => {
+      setSecurityStatus('Checking RBAC policies...');
+    }, 1400);
+    setTimeout(() => {
+      setSecurityStatus('Security audit passed');
+      setSecurityRunning(false);
+      addLog('Security scan verified guardrails + audit trail.');
+    }, 2200);
   };
 
   const evidenceAnchors = [
     {
       id: 'E-104',
       label: 'Medication timeline',
-      source: 'Exhibit 04 • Page 18',
+      source: 'Exhibit 04 - Page 18',
       status: 'Verified',
     },
     {
       id: 'E-211',
       label: 'Vitals anomaly window',
-      source: 'Exhibit 11 • Page 6',
+      source: 'Exhibit 11 - Page 6',
       status: 'Verified',
     },
     {
       id: 'E-332',
       label: 'Consent discrepancy',
-      source: 'Exhibit 19 • Page 3',
+      source: 'Exhibit 19 - Page 3',
       status: 'Flagged',
     },
   ];
@@ -164,12 +184,13 @@ function App() {
             <a href="#proof" className="hover:text-lexi-mist">Proof</a>
             <a href="#why-now" className="hover:text-lexi-mist">Why Now</a>
           </nav>
-          <a
-            href="#contact"
+          <button
+            type="button"
+            onClick={() => setDemoModalOpen(true)}
             className="rounded-full border border-lexi-sun px-4 py-2 text-xs uppercase tracking-[0.3em] text-lexi-sun transition hover:bg-lexi-sun hover:text-lexi-ink"
           >
             Request Demo
-          </a>
+          </button>
         </div>
       </header>
 
@@ -661,7 +682,7 @@ function App() {
                         Run audit
                       </button>
                       <div className="rounded-full bg-lexi-ink/80 px-4 py-2 text-sm text-lexi-mist">
-                        Score {auditScore}/100 • Risk {riskBand}
+                        Score {auditScore}/100 - Risk {riskBand}
                       </div>
                     </div>
                   </div>
@@ -690,6 +711,16 @@ function App() {
                         >
                           <p className="text-xs uppercase tracking-[0.3em] text-lexi-sun">{item.label}</p>
                           <p className="mt-2 text-sm text-lexi-slate">{item.detail}</p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setToastMessage(`${item.label} queued.`);
+                              setTimeout(() => setToastMessage(''), 2200);
+                            }}
+                            className="mt-4 w-full rounded-full border border-white/20 px-3 py-2 text-[10px] uppercase tracking-[0.3em] text-lexi-mist hover:border-white/40"
+                          >
+                            Trigger export
+                          </button>
                           <div className="mt-4 flex items-center justify-between text-[10px] uppercase tracking-[0.3em] text-lexi-slate">
                             <span>Status</span>
                             <span className="text-lexi-sun status-pulse">READY</span>
@@ -732,12 +763,18 @@ function App() {
                         </div>
                       ))}
                     </div>
-                    <button
-                      onClick={runSecurity}
-                      className="rounded-full bg-lexi-sun px-6 py-3 text-xs font-semibold uppercase tracking-[0.3em] text-lexi-ink"
-                    >
-                      Run security check
-                    </button>
+                    <div className="flex flex-wrap items-center gap-4">
+                      <button
+                        onClick={runSecurity}
+                        className="rounded-full bg-lexi-sun px-6 py-3 text-xs font-semibold uppercase tracking-[0.3em] text-lexi-ink disabled:opacity-70"
+                        disabled={securityRunning}
+                      >
+                        {securityRunning ? 'Running diagnostics...' : 'Run security check'}
+                      </button>
+                      <div className="rounded-full bg-lexi-ink/80 px-4 py-2 text-sm text-lexi-mist">
+                        {securityStatus}
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -1040,12 +1077,13 @@ function App() {
                 </h2>
               </div>
               <div className="flex flex-col gap-3 sm:flex-row">
-                <a
-                  href="mailto:demo@lexipro.ai"
+                <button
+                  type="button"
+                  onClick={() => setDemoModalOpen(true)}
                   className="rounded-full bg-lexi-sun px-6 py-3 text-xs font-semibold uppercase tracking-[0.3em] text-lexi-ink transition hover:-translate-y-0.5 hover:shadow-[0_12px_32px_rgba(246,191,77,0.35)]"
                 >
-                  Email demo@lexipro.ai
-                </a>
+                  Request demo access
+                </button>
                 <a
                   href="#pillars"
                   className="rounded-full border border-white/20 px-6 py-3 text-xs uppercase tracking-[0.3em] text-lexi-mist"
@@ -1064,10 +1102,68 @@ function App() {
           <span>Evidence bound. Audit ready. Deployment proven.</span>
         </div>
       </footer>
+      {toastMessage ? (
+        <div className="fixed right-6 top-24 z-50 rounded-2xl border border-white/10 bg-lexi-ink/90 px-4 py-3 text-xs text-lexi-mist shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
+          {toastMessage}
+        </div>
+      ) : null}
+      {demoModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-6">
+          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-lexi-panel p-6">
+            <div className="flex items-center justify-between">
+              <p className="text-xs uppercase tracking-[0.3em] text-lexi-sun">Request demo</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setDemoModalOpen(false);
+                  setDemoSubmitted(false);
+                  setDemoEmail('');
+                }}
+                className="text-xs uppercase tracking-[0.3em] text-lexi-slate"
+              >
+                Close
+              </button>
+            </div>
+            {!demoSubmitted ? (
+              <div className="mt-4 space-y-4">
+                <p className="text-sm text-lexi-slate">
+                  Enter your enterprise email to receive the diligence pack.
+                </p>
+                <input
+                  value={demoEmail}
+                  onChange={(event) => setDemoEmail(event.target.value)}
+                  placeholder="name@firm.com"
+                  className="w-full rounded-xl border border-white/10 bg-lexi-ink/80 px-3 py-2 text-sm text-lexi-mist"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!demoEmail) return;
+                    setDemoSubmitted(true);
+                    addLog(`Demo request captured: ${demoEmail}.`);
+                  }}
+                  className="w-full rounded-full bg-lexi-sun px-4 py-3 text-xs font-semibold uppercase tracking-[0.3em] text-lexi-ink"
+                >
+                  Submit request
+                </button>
+              </div>
+            ) : (
+              <div className="mt-4 space-y-3 text-sm text-lexi-slate">
+                <p>Request received.</p>
+                <p>
+                  A dedicated account manager will contact <span className="text-lexi-mist">{demoEmail}</span>
+                  {' '}within 4 hours.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
 
 export default App;
+
 
 
