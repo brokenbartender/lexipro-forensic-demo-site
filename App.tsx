@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 function App() {
   const [activeDemo, setActiveDemo] = useState('intake');
@@ -20,6 +20,9 @@ function App() {
   const [demoEmail, setDemoEmail] = useState('');
   const [demoSubmitted, setDemoSubmitted] = useState(false);
   const [proofModal, setProofModal] = useState<{ title: string; detail: string } | null>(null);
+  const [comparisonValue, setComparisonValue] = useState(55);
+  const [roiVisible, setRoiVisible] = useState(false);
+  const roiRef = useRef<HTMLDivElement | null>(null);
 
   const demoModules = useMemo(
     () => [
@@ -112,6 +115,20 @@ function App() {
       });
     }, 600);
   };
+
+  useEffect(() => {
+    if (!roiRef.current) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setRoiVisible(true);
+        }
+      },
+      { threshold: 0.35 },
+    );
+    observer.observe(roiRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   const exportAuditCsv = () => {
     const rows = [
@@ -797,7 +814,7 @@ function App() {
                 )}
 
                 {activeDemo === 'roi' && (
-                  <div className="space-y-6">
+                  <div className="space-y-6" ref={roiRef}>
                     <div>
                       <p className="text-xs uppercase tracking-[0.3em] text-lexi-sun">ROI Snapshot</p>
                       <h3 className="mt-2 text-2xl font-semibold text-white">
@@ -840,6 +857,28 @@ function App() {
                           </p>
                         </div>
                       ))}
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4">
+                        <p className="text-xs uppercase tracking-[0.3em] text-lexi-slate">Audit time</p>
+                        <div className="mt-4 h-3 rounded-full bg-white/10">
+                          <div className={`roi-bar roi-bar-manual ${roiVisible ? 'roi-bar-animate' : ''}`} />
+                        </div>
+                        <div className="mt-2 flex justify-between text-[10px] uppercase tracking-[0.3em] text-lexi-slate">
+                          <span>Manual 100%</span>
+                          <span>LexiPro 2%</span>
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4">
+                        <p className="text-xs uppercase tracking-[0.3em] text-lexi-slate">Admissibility</p>
+                        <div className="mt-4 h-3 rounded-full bg-white/10">
+                          <div className={`roi-bar roi-bar-admissible ${roiVisible ? 'roi-bar-animate' : ''}`} />
+                        </div>
+                        <div className="mt-2 flex justify-between text-[10px] uppercase tracking-[0.3em] text-lexi-slate">
+                          <span>Uncertain</span>
+                          <span>Guaranteed 100%</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -900,36 +939,64 @@ function App() {
                 custody, and auditability.
               </p>
             </div>
-            <div className="mt-8 grid gap-6 lg:grid-cols-2">
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-                <p className="text-xs uppercase tracking-[0.3em] text-lexi-slate">Before</p>
-                <h3 className="mt-3 text-xl font-semibold text-white">Discovery chaos</h3>
-                <div className="mt-6 space-y-4 text-sm text-lexi-slate">
-                  <div className="rounded-2xl border border-white/10 bg-lexi-ink/70 px-4 py-3">
-                    Unstructured exhibits, inconsistent logs.
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-lexi-ink/70 px-4 py-3">
-                    No consistent citations or custody chain.
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-lexi-ink/70 px-4 py-3">
-                    Review time balloons; admissibility uncertain.
-                  </div>
-                </div>
-              </div>
-              <div className="rounded-3xl border border-lexi-sun/40 bg-lexi-ink/70 p-6 pulse-glow">
-                <p className="text-xs uppercase tracking-[0.3em] text-lexi-sun">After</p>
-                <h3 className="mt-3 text-xl font-semibold text-white">Deterministic proof</h3>
-                <div className="mt-6 space-y-4 text-sm text-lexi-mist">
-                  <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                    Exhibits hashed and sealed with custody continuity.
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                    Every claim anchored to verified citations.
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                    Audit‑ready exports delivered in minutes.
+            <div className="mt-8">
+              <div className="comparison-shell">
+                <div className="comparison-layer comparison-chaos">
+                  <p className="text-xs uppercase tracking-[0.3em] text-red-300">Before</p>
+                  <h3 className="mt-3 text-xl font-semibold text-white">Discovery chaos</h3>
+                  <div className="mt-6 grid gap-3 text-sm text-lexi-slate">
+                    {[
+                      'Unverified exhibits',
+                      'Missing citations',
+                      'Risky exports',
+                      'Manual review backlog',
+                    ].map((item) => (
+                      <div
+                        key={item}
+                        className="rounded-2xl border border-red-500/30 bg-red-900/20 px-4 py-3 text-red-100"
+                      >
+                        {item}
+                      </div>
+                    ))}
                   </div>
                 </div>
+                <div
+                  className="comparison-layer comparison-order"
+                  style={{ clipPath: `inset(0 ${100 - comparisonValue}% 0 0)` }}
+                >
+                  <p className="text-xs uppercase tracking-[0.3em] text-lexi-sun">After</p>
+                  <h3 className="mt-3 text-xl font-semibold text-white">Deterministic proof</h3>
+                  <div className="mt-6 grid gap-3 text-sm text-lexi-mist">
+                    {[
+                      'Exhibits hashed & sealed',
+                      'Anchors verified',
+                      'Audit exports signed',
+                      'Admissibility guaranteed',
+                    ].map((item) => (
+                      <div
+                        key={item}
+                        className="rounded-2xl border border-lexi-sun/30 bg-lexi-ink/70 px-4 py-3"
+                      >
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div
+                  className="comparison-handle"
+                  style={{ left: `calc(${comparisonValue}% - 18px)` }}
+                >
+                  <span className="comparison-knob" />
+                </div>
+                <input
+                  type="range"
+                  min="5"
+                  max="95"
+                  value={comparisonValue}
+                  onChange={(event) => setComparisonValue(Number(event.target.value))}
+                  className="comparison-range"
+                  aria-label="Chaos to order slider"
+                />
               </div>
             </div>
           </div>
@@ -1134,6 +1201,12 @@ function App() {
           <span>Evidence bound. Audit ready. Deployment proven.</span>
         </div>
       </footer>
+      <div className="heartbeat-bar">
+        <span className="heartbeat-dot" />
+        <span>SYSTEM ACTIVE</span>
+        <span>ENCRYPTION: AES-256</span>
+        <span>LAST AUDIT: 2s AGO</span>
+      </div>
       {tourStep >= guidedSteps.length && !tourRunning ? (
         <div className="fixed left-1/2 top-20 z-40 -translate-x-1/2 rounded-full border border-lexi-sun/40 bg-lexi-ink/90 px-4 py-2 text-[10px] uppercase tracking-[0.3em] text-lexi-sun shadow-[0_12px_32px_rgba(0,0,0,0.35)]">
           Tour complete - deterministic output verified
